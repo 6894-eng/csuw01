@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LC-MS/MS 單點定量計算機</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        /* 隱藏數字輸入框的上下箭頭 */
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+    </style>
+</head>
+<body class="text-gray-800 antialiased p-4 md:p-8">
+
+    <div class="max-w-5xl mx-auto space-y-6">
+        
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">LC-MS/MS 單點定量計算機</h1>
+            <p class="text-gray-600">內標法 (Internal Standard) 單點校正專用</p>
+        </div>
+
+        <!-- Standard Section -->
+        <div class="bg-white rounded-xl shadow-sm border border-blue-100 overflow-hidden">
+            <div class="bg-blue-50 px-6 py-4 border-b border-blue-100 flex justify-between items-center">
+                <h2 class="text-lg font-semibold text-blue-800">1. 標準品設定 (Calibrator)</h2>
+                <div class="text-sm text-blue-600 font-medium">
+                    標準品面積比值：<span id="std-ratio-display" class="text-xl font-bold text-blue-700 ml-1">0.0000</span>
+                </div>
+            </div>
+            <div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">標準品濃度 (ng/mL)</label>
+                    <input type="number" id="std-conc" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="例如: 100" value="100">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">目標藥物 Peak Area</label>
+                    <input type="number" id="std-drug-area" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="例如: 25000">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">內標 (IS) Peak Area</label>
+                    <input type="number" id="std-is-area" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="例如: 50000">
+                </div>
+            </div>
+        </div>
+
+        <!-- Samples Section -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <h2 class="text-lg font-semibold text-gray-800">2. 未知檢體數據 (Unknown Samples)</h2>
+                <div class="flex gap-2">
+                    <button onclick="copyResults(this)" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+                        複製結果
+                    </button>
+                    <button onclick="addSampleRow()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm">
+                        + 新增檢體
+                    </button>
+                </div>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-50/50 text-gray-500 text-sm border-b border-gray-200">
+                            <th class="px-6 py-3 font-medium">樣品名稱</th>
+                            <th class="px-6 py-3 font-medium">藥物 Peak Area</th>
+                            <th class="px-6 py-3 font-medium">內標 Peak Area</th>
+                            <th class="px-6 py-3 font-medium text-right">面積比值</th>
+                            <th class="px-6 py-3 font-medium text-right text-indigo-700">計算濃度</th>
+                            <th class="px-6 py-3 font-medium text-center">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="samples-body" class="divide-y divide-gray-100">
+                        <!-- 預設第一行檢體 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Notes Section -->
+        <div class="bg-amber-50 rounded-xl p-6 border border-amber-100">
+            <h3 class="text-amber-800 font-semibold mb-2 flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                實務提醒
+            </h3>
+            <ul class="list-disc list-inside text-amber-700 text-sm space-y-1">
+                <li><strong>計算公式：</strong>未知物濃度 = 未知物面積比值 × (標準品濃度 ÷ 標準品面積比值)</li>
+                <li><strong>內標穩定性：</strong>請隨時注意檢體的內標 Peak Area 是否與標準品相近，若落差過大（如 >30%）可能存在嚴重基質效應。</li>
+                <li>若計算結果顯示為 <code>NaN</code>，請確認是否所有面積欄位皆已填入大於 0 的數值。</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        let sampleCount = 0;
+
+        // 初始化
+        window.onload = () => {
+            // 綁定標準品的事件監聽
+            document.getElementById('std-conc').addEventListener('input', calculateAll);
+            document.getElementById('std-drug-area').addEventListener('input', calculateAll);
+            document.getElementById('std-is-area').addEventListener('input', calculateAll);
+            
+            // 預設加入兩個檢體列
+            addSampleRow();
+            addSampleRow();
+        };
+
+        // 新增檢體列
+        function addSampleRow() {
+            sampleCount++;
+            const tbody = document.getElementById('samples-body');
+            const tr = document.createElement('tr');
+            tr.id = `sample-row-${sampleCount}`;
+            tr.className = "hover:bg-gray-50 transition-colors";
+            
+            tr.innerHTML = `
+                <td class="px-6 py-4">
+                    <input type="text" class="w-full px-3 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500 outline-none text-sm" value="Sample ${sampleCount}">
+                </td>
+                <td class="px-6 py-4">
+                    <input type="number" class="sample-drug-area w-full px-3 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500 outline-none text-sm" placeholder="Area">
+                </td>
+                <td class="px-6 py-4">
+                    <input type="number" class="sample-is-area w-full px-3 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500 outline-none text-sm" placeholder="Area">
+                </td>
+                <td class="px-6 py-4 text-right">
+                    <span class="sample-ratio text-gray-600 font-mono">-</span>
+                </td>
+                <td class="px-6 py-4 text-right">
+                    <span class="sample-conc text-lg font-bold text-indigo-600 font-mono">-</span>
+                </td>
+                <td class="px-6 py-4 text-center">
+                    <button onclick="removeSampleRow(${sampleCount})" class="text-red-400 hover:text-red-600 transition p-1">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                </td>
+            `;
+            
+            tbody.appendChild(tr);
+
+            // 綁定這列輸入框的事件監聽
+            const inputs = tr.querySelectorAll('input[type="number"]');
+            inputs.forEach(input => {
+                input.addEventListener('input', calculateAll);
+            });
+        }
+
+        // 移除檢體列
+        function removeSampleRow(id) {
+            const row = document.getElementById(`sample-row-${id}`);
+            if (row) {
+                row.remove();
+                calculateAll(); // 重新計算
+            }
+        }
+
+        // 核心計算邏輯
+        function calculateAll() {
+            // 1. 取得標準品數據並計算 Ratio
+            const stdConc = parseFloat(document.getElementById('std-conc').value);
+            const stdDrug = parseFloat(document.getElementById('std-drug-area').value);
+            const stdIs = parseFloat(document.getElementById('std-is-area').value);
+            
+            let stdRatio = 0;
+            const stdRatioDisplay = document.getElementById('std-ratio-display');
+            
+            if (!isNaN(stdDrug) && !isNaN(stdIs) && stdIs > 0) {
+                stdRatio = stdDrug / stdIs;
+                stdRatioDisplay.textContent = stdRatio.toFixed(4);
+            } else {
+                stdRatioDisplay.textContent = "0.0000";
+            }
+
+            // 2. 準備標準品轉換因子 (濃度 / 比值)
+            let factor = 0;
+            let canCalculateConc = false;
+            if (stdRatio > 0 && !isNaN(stdConc)) {
+                factor = stdConc / stdRatio;
+                canCalculateConc = true;
+            }
+
+            // 3. 遍歷所有檢體進行計算
+            const tbody = document.getElementById('samples-body');
+            const rows = tbody.querySelectorAll('tr');
+            
+            rows.forEach(row => {
+                const drugInput = row.querySelector('.sample-drug-area');
+                const isInput = row.querySelector('.sample-is-area');
+                const ratioDisplay = row.querySelector('.sample-ratio');
+                const concDisplay = row.querySelector('.sample-conc');
+
+                const drugArea = parseFloat(drugInput.value);
+                const isArea = parseFloat(isInput.value);
+
+                if (!isNaN(drugArea) && !isNaN(isArea) && isArea > 0) {
+                    // 計算未知物比值
+                    const unkRatio = drugArea / isArea;
+                    ratioDisplay.textContent = unkRatio.toFixed(4);
+
+                    // 計算未知物濃度
+                    if (canCalculateConc) {
+                        const unkConc = unkRatio * factor;
+                        concDisplay.textContent = unkConc.toFixed(2);
+                    } else {
+                        concDisplay.textContent = "-";
+                    }
+                } else {
+                    ratioDisplay.textContent = "-";
+                    concDisplay.textContent = "-";
+                }
+            });
+        }
+
+        // 複製結果至剪貼簿
+        function copyResults(btnElement) {
+            const tbody = document.getElementById('samples-body');
+            const rows = tbody.querySelectorAll('tr');
+            let textToCopy = "樣品名稱\t計算濃度\n"; // 加入標題與 Tab 分隔符號
+
+            rows.forEach(row => {
+                const nameInput = row.querySelector('td:nth-child(1) input');
+                const concDisplay = row.querySelector('.sample-conc');
+                
+                const name = nameInput ? nameInput.value : "";
+                const conc = concDisplay ? concDisplay.textContent : "";
+                
+                textToCopy += `${name}\t${conc}\n`;
+            });
+
+            // 支援網頁限制，使用 textarea 與 execCommand 複製
+            const textarea = document.createElement('textarea');
+            textarea.value = textToCopy;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            
+            try {
+                document.execCommand('copy');
+                
+                // 按鈕視覺回饋 (短暫變更文字與圖示)
+                const originalHTML = btnElement.innerHTML;
+                btnElement.innerHTML = `<svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>已複製!`;
+                
+                setTimeout(() => {
+                    btnElement.innerHTML = originalHTML;
+                }, 2000);
+            } catch (err) {
+                console.error('複製失敗', err);
+            }
+            document.body.removeChild(textarea);
+        }
+    </script>
+</body>
+</html>
