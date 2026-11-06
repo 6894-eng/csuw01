@@ -215,12 +215,24 @@
                     if (canCalculateConc) {
                         const unkConc = unkRatio * factor;
                         concDisplay.textContent = unkConc.toFixed(2);
+                        
+                        // 依據標準品濃度判定文字顏色
+                        concDisplay.classList.remove('text-indigo-600', 'text-red-600', 'text-blue-600');
+                        if (unkConc >= stdConc) {
+                            concDisplay.classList.add('text-red-600');
+                        } else {
+                            concDisplay.classList.add('text-blue-600');
+                        }
                     } else {
                         concDisplay.textContent = "-";
+                        concDisplay.classList.remove('text-red-600', 'text-blue-600');
+                        concDisplay.classList.add('text-indigo-600');
                     }
                 } else {
                     ratioDisplay.textContent = "-";
                     concDisplay.textContent = "-";
+                    concDisplay.classList.remove('text-red-600', 'text-blue-600');
+                    concDisplay.classList.add('text-indigo-600');
                 }
             });
         }
